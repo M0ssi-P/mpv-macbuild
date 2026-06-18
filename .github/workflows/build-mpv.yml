@@ -20,6 +20,10 @@ jobs:
         run: |
           git clone https://github.com/mpv-player/mpv-build.git
           cd mpv-build
+
+          ./use-mpv-master
+          ./use-ffmpeg-master
+          ./use-libass-master
           
           # Configure libmpv dynamic compilation
           echo --enable-libmpv >> mpv-options
@@ -30,7 +34,6 @@ jobs:
           echo --disable-shared >> libass-options
           echo --enable-static >> libass-options
           
-          ./use-mpv-release
           ./update
 
       - name: Compile Apple Silicon Slice (arm64)
