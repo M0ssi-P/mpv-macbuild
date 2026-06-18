@@ -14,7 +14,7 @@ jobs:
 
       - name: Install System Build Prerequisites
         run: |
-          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja
+          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
 
       - name: Clone mpv-build Tree
         run: |
