@@ -25,11 +25,20 @@ jobs:
           ./use-ffmpeg-master
           ./use-libass-master
           
-          # Configure libmpv dynamic compilation
+          # 1. Force libmpv library generation
           echo -Dlibmpv=true >> mpv-options
           
-          # 3. Disable the standalone CLI player executable (only build the library context)
+          # 2. Kill the standard CLI player executable
           echo -Dcplayer=false >> mpv-options
+
+          # 3. Completely shut down the Swift compilation framework
+          echo -Dswift-build=disabled >> mpv-options
+
+          # 4. Turn off all native macOS UI/windowing backends completely
+          echo -Dcocoa=disabled >> mpv-options
+          echo -Dmacos-cocoa-cb=disabled >> mpv-options
+          echo -Dmacos-media-player=disabled >> mpv-options
+          echo -Dmacos-touchbar=disabled >> mpv-options
           
           # Force dependencies to stitch themselves strictly as static modules
           echo --disable-shared >> ffmpeg-options
