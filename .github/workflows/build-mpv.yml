@@ -16,42 +16,41 @@ jobs:
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
 
-      - name: Clone mpv-build Tree
+      - name: Clone mpv-build Tree & Force Latest Master Branches
         run: |
           git clone https://github.com/mpv-player/mpv-build.git
           cd mpv-build
-
+          
+          # Force the build scripts to track the absolute latest master/main branches
           ./use-mpv-master
           ./use-ffmpeg-master
           ./use-libass-master
           
-          # 1. Force libmpv library generation
+          # Force libmpv library generation instead of an app wrapper
           echo -Dlibmpv=true >> mpv-options
-          
-          # 2. Kill the standard CLI player executable
           echo -Dcplayer=false >> mpv-options
-
-          # 3. Completely shut down the Swift compilation framework
           echo -Dswift-build=disabled >> mpv-options
-
-          # 4. Turn off all native macOS UI/windowing backends completely
           echo -Dcocoa=disabled >> mpv-options
           echo -Dmacos-cocoa-cb=disabled >> mpv-options
           echo -Dmacos-media-player=disabled >> mpv-options
           echo -Dmacos-touchbar=disabled >> mpv-options
           
-          # Force dependencies to stitch themselves strictly as static modules
+          # Force internal dependencies to compile statically into the library context
           echo --disable-shared >> ffmpeg-options
           echo --enable-static >> ffmpeg-options
           echo --disable-shared >> libass-options
           echo --enable-static >> libass-options
           
+          # Pull down and refresh the source files
           ./update
 
       - name: Compile Apple Silicon Slice (arm64)
         run: |
           cd mpv-build
           ./clean
+          # CRITICAL: Nuke the cached Meson state to apply your -Dcocoa=disabled options cleanly
+          rm -rf mpv/build
+          
           export CFLAGS="-arch arm64"
           export LDFLAGS="-arch arm64"
           ./build -j4
@@ -63,6 +62,9 @@ jobs:
         run: |
           cd mpv-build
           ./clean
+          # CRITICAL: Nuke the cached Meson state again for the fresh cross-compilation cross-section
+          rm -rf mpv/build
+          
           export CFLAGS="-arch x86_64"
           export LDFLAGS="-arch x86_64"
           ./build -j4
@@ -73,7 +75,7 @@ jobs:
       - name: Assemble Universal Fat Binary & Apply Signatures
         run: |
           cd dist
-          # Stitch them together
+          # Stitch them together into a fat universal binary
           lipo -create -output libmpv.dylib arm64/libmpv.dylib x86_64/libmpv.dylib
           
           # Update the internal shared library identification tag for JVM relative lookups
@@ -83,7 +85,7 @@ jobs:
           xattr -cr libmpv.dylib
           codesign --force -s - libmpv.dylib
           
-          # Quick verification check inside the logs
+          # Verify architecture packaging structures
           lipo -archs libmpv.dylib
 
       - name: Create GitHub Release and Upload Binary Asset
