@@ -27,13 +27,9 @@ jobs:
           
           # Configure libmpv dynamic compilation
           echo -Dlibmpv=true >> mpv-options
-
-          echo -Dswift-build=disabled >> mpv-options
           
           # 3. Disable the standalone CLI player executable (only build the library context)
           echo -Dcplayer=false >> mpv-options
-
-          echo -Dcocoa=disabled >> mpv-options
           
           # Force dependencies to stitch themselves strictly as static modules
           echo --disable-shared >> ffmpeg-options
