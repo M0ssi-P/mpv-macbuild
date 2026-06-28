@@ -24,27 +24,32 @@ jobs:
           ./use-ffmpeg-master
           ./use-libass-master
 
-          cat > mpv-options << 'EOF'
-          -Dlibmpv=true
-          -Dcplayer=false
-          -Dswift-build=disabled
-          -Dcocoa=disabled
-          -Dmacos-cocoa-cb=disabled
-          -Dmacos-media-player=disabled
-          -Dmacos-touchbar=disabled
-          EOF
+          printf '%s\n' \
+            '-Dlibmpv=true' \
+            '-Dcplayer=false' \
+            '-Dswift-build=disabled' \
+            '-Dcocoa=disabled' \
+            '-Dmacos-cocoa-cb=disabled' \
+            '-Dmacos-media-player=disabled' \
+            '-Dmacos-touchbar=disabled' \
+            > mpv-options
 
-          cat > ffmpeg-options << 'EOF'
-          --disable-shared
-          --enable-static
-          --disable-programs
-          --disable-doc
-          EOF
+          printf '%s\n' \
+            '--disable-shared' \
+            '--enable-static' \
+            '--disable-programs' \
+            '--disable-doc' \
+            > ffmpeg-options
 
-          cat > libass-options << 'EOF'
-          --disable-shared
-          --enable-static
-          EOF
+          printf '%s\n' \
+            '--disable-shared' \
+            '--enable-static' \
+            > libass-options
+
+          # Verify files look correct before proceeding
+          echo "=== mpv-options ===" && cat mpv-options
+          echo "=== ffmpeg-options ===" && cat ffmpeg-options
+          echo "=== libass-options ===" && cat libass-options
 
           ./update
 
