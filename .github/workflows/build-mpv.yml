@@ -6,89 +6,163 @@ on:
       - 'v*'
 
 jobs:
-  build-macos:
+  build-arm64:
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install System Build Prerequisites
+      - name: Install Build Prerequisites
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
 
-      - name: Clone mpv-build Tree & Force Latest Master Branches
+      - name: Clone mpv-build & Write Options
         run: |
           git clone https://github.com/mpv-player/mpv-build.git
           cd mpv-build
-          
-          # Force the build scripts to track the absolute latest master/main branches
           ./use-mpv-master
           ./use-ffmpeg-master
           ./use-libass-master
-          
-          # Force libmpv library generation instead of an app wrapper
-          echo -Dlibmpv=true >> mpv-options
-          echo -Dcplayer=false >> mpv-options
-          echo -Dswift-build=disabled >> mpv-options
-          echo -Dcocoa=disabled >> mpv-options
-          echo -Dmacos-cocoa-cb=disabled >> mpv-options
-          echo -Dmacos-media-player=disabled >> mpv-options
-          echo -Dmacos-touchbar=disabled >> mpv-options
-          
-          # Force internal dependencies to compile statically into the library context
-          echo --disable-shared >> ffmpeg-options
-          echo --enable-static >> ffmpeg-options
-          echo --disable-shared >> libass-options
-          echo --enable-static >> libass-options
-          
-          # Pull down and refresh the source files
+
+          cat > mpv-options << 'EOF'
+          -Dlibmpv=true
+          -Dcplayer=false
+          -Dswift-build=disabled
+          -Dcocoa=disabled
+          -Dmacos-cocoa-cb=disabled
+          -Dmacos-media-player=disabled
+          -Dmacos-touchbar=disabled
+          EOF
+
+          cat > ffmpeg-options << 'EOF'
+          --disable-shared
+          --enable-static
+          --disable-programs
+          --disable-doc
+          EOF
+
+          cat > libass-options << 'EOF'
+          --disable-shared
+          --enable-static
+          EOF
+
           ./update
 
-      - name: Compile Apple Silicon Slice (arm64)
+      - name: Build arm64 Slice
         run: |
           cd mpv-build
           ./clean
-          # CRITICAL: Nuke the cached Meson state to apply your -Dcocoa=disabled options cleanly
-          rm -rf mpv/build
-          
+          rm -rf mpv/build build_libs
+
           export CFLAGS="-arch arm64"
+          export CXXFLAGS="-arch arm64"
           export LDFLAGS="-arch arm64"
-          ./build -j4
-          
+          ./build -j$(sysctl -n hw.logicalcpu)
+
+          grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || true
+
           mkdir -p ../dist/arm64
           cp mpv/build/libmpv.dylib ../dist/arm64/libmpv.dylib
 
-      - name: Compile Intel Slice (x86_64)
+      - name: Upload arm64 Slice
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-arm64
+          path: dist/arm64/libmpv.dylib
+
+  build-x86_64:
+    runs-on: macos-13  # Last Intel GitHub Actions runner
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Prerequisites
+        run: |
+          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
+
+      - name: Clone mpv-build & Write Options
+        run: |
+          git clone https://github.com/mpv-player/mpv-build.git
+          cd mpv-build
+          ./use-mpv-master
+          ./use-ffmpeg-master
+          ./use-libass-master
+
+          cat > mpv-options << 'EOF'
+          -Dlibmpv=true
+          -Dcplayer=false
+          -Dswift-build=disabled
+          -Dcocoa=disabled
+          -Dmacos-cocoa-cb=disabled
+          -Dmacos-media-player=disabled
+          -Dmacos-touchbar=disabled
+          EOF
+
+          cat > ffmpeg-options << 'EOF'
+          --disable-shared
+          --enable-static
+          --disable-programs
+          --disable-doc
+          EOF
+
+          cat > libass-options << 'EOF'
+          --disable-shared
+          --enable-static
+          EOF
+
+          ./update
+
+      - name: Build x86_64 Slice
         run: |
           cd mpv-build
           ./clean
-          # CRITICAL: Nuke the cached Meson state again for the fresh cross-compilation cross-section
-          rm -rf mpv/build
-          
-          export CFLAGS="-arch x86_64"
-          export LDFLAGS="-arch x86_64"
-          ./build -j4
-          
+          rm -rf mpv/build build_libs
+
+          # No arch flags needed - this runner IS x86_64, builds natively
+          export CXXFLAGS=""
+          ./build -j$(sysctl -n hw.logicalcpu)
+
+          grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || true
+
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
 
-      - name: Assemble Universal Fat Binary & Apply Signatures
-        run: |
-          cd dist
-          # Stitch them together into a fat universal binary
-          lipo -create -output libmpv.dylib arm64/libmpv.dylib x86_64/libmpv.dylib
-          
-          # Update the internal shared library identification tag for JVM relative lookups
-          install_name_tool -id "@loader_path/libmpv.dylib" libmpv.dylib
-          
-          # Strip quarantine metadata and force ad-hoc code signature
-          xattr -cr libmpv.dylib
-          codesign --force -s - libmpv.dylib
-          
-          # Verify architecture packaging structures
-          lipo -archs libmpv.dylib
+      - name: Upload x86_64 Slice
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-x86_64
+          path: dist/x86_64/libmpv.dylib
 
-      - name: Create GitHub Release and Upload Binary Asset
+  assemble:
+    needs: [build-arm64, build-x86_64]
+    runs-on: macos-latest
+    steps:
+      - name: Download Slices
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Assemble Universal Binary
+        run: |
+          lipo -create \
+            -output dist/libmpv.dylib \
+            dist/libmpv-arm64/libmpv.dylib \
+            dist/libmpv-x86_64/libmpv.dylib
+
+          install_name_tool -id "@rpath/libmpv.dylib" dist/libmpv.dylib
+
+          xattr -cr dist/libmpv.dylib
+          codesign --force -s - dist/libmpv.dylib
+
+          # Verify both arches are present
+          lipo -archs dist/libmpv.dylib
+
+          # Verify FFmpeg is not an external dependency
+          otool -L dist/libmpv.dylib | grep -E "libav|libsw|libass" \
+            && echo "FAIL: external deps found" && exit 1 \
+            || echo "OK: self-contained"
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/libmpv.dylib
