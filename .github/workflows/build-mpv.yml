@@ -12,7 +12,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Build Prerequisites
+      - name: Install Build Prerequisit
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
 
