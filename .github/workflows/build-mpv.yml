@@ -38,20 +38,11 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
-            "-Dextra_cflags=-I$BUILD_LIBS/include -arch arm64" \
-            "-Dextra_ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > mpv_options
 
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
-            "FREETYPE_CFLAGS=-I$BUILD_LIBS/include/freetype2" \
-            "FREETYPE_LIBS=-L$BUILD_LIBS/lib -lfreetype -lz -lbz2 -lharfbuzz" \
-            "FRIBIDI_CFLAGS=-I$BUILD_LIBS/include/fribidi" \
-            "FRIBIDI_LIBS=-L$BUILD_LIBS/lib -lfribidi" \
-            "HARFBUZZ_CFLAGS=-I$BUILD_LIBS/include/harfbuzz" \
-            "HARFBUZZ_LIBS=-L$BUILD_LIBS/lib -lharfbuzz" \
-            "AM_CFLAGS=-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
@@ -189,22 +180,25 @@ jobs:
             '--disable-programs' \
             '--disable-doc' \
             '--enable-gnutls' \
-            "--extra-cflags=-I$BUILD_LIBS/include -arch arm64" \
-            "--extra-ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
       - name: Build arm64 Slice
         run: |
           cd mpv-build
-          ./clean
-          rm -rf mpv/build
+          rm -rf mpv/build          # only wipe mpv's meson build
+          rm -rf libass/.libs       # wipe libass's previous build if any
+          rm -rf libplacebo/build   # wipe libplacebo's previous build if any
+          # DO NOT run ./clean — it deletes build_libs and destroys our pre-built deps
 
           BUILD_LIBS="$(pwd)/build_libs"
           
-          # Force the pkg-config directories directly inline on execution
-          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
-          PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig" \
+          export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
+          export LDFLAGS="-L$BUILD_LIBS/lib -arch arm64"
+          export CFLAGS="-arch arm64"
+          export CXXFLAGS="-arch arm64"
           ./build -j$(sysctl -n hw.logicalcpu)
           
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
@@ -252,20 +246,11 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
-            "-Dextra_cflags=-I$BUILD_LIBS/include -arch arm64" \
-            "-Dextra_ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > mpv_options
 
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
-            "FREETYPE_CFLAGS=-I$BUILD_LIBS/include/freetype2" \
-            "FREETYPE_LIBS=-L$BUILD_LIBS/lib -lfreetype -lz -lbz2 -lharfbuzz" \
-            "FRIBIDI_CFLAGS=-I$BUILD_LIBS/include/fribidi" \
-            "FRIBIDI_LIBS=-L$BUILD_LIBS/lib -lfribidi" \
-            "HARFBUZZ_CFLAGS=-I$BUILD_LIBS/include/harfbuzz" \
-            "HARFBUZZ_LIBS=-L$BUILD_LIBS/lib -lharfbuzz" \
-            "AM_CFLAGS=-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
@@ -396,16 +381,16 @@ jobs:
             '--disable-programs' \
             '--disable-doc' \
             '--enable-gnutls' \
-            "--extra-cflags=-I$BUILD_LIBS/include -arch arm64" \
-            "--extra-ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
       - name: Build x86_64 Slice
         run: |
           cd mpv-build
-          ./clean
-          rm -rf mpv/build
+          rm -rf mpv/build          # only wipe mpv's meson build
+          rm -rf libass/.libs       # wipe libass's previous build if any
+          rm -rf libplacebo/build   # wipe libplacebo's previous build if any
+          # DO NOT run ./clean — it deletes build_libs and destroys our pre-built deps
 
           BUILD_LIBS="$(pwd)/build_libs"
           
