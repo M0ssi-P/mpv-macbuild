@@ -174,12 +174,18 @@ jobs:
       - name: Write ffmpeg_options (arm64)
         run: |
           cd mpv-build
+          BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+          # Insert PKG_CONFIG_PATH export right after the BUILD= line
+          sed -i '' "s|BUILD=\"\$(pwd)\"|BUILD=\"\$(pwd)\"\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"|" \
+          mpv-build/scripts/ffmpeg-config
+          echo "=== patched ffmpeg-config ==="
+          head -20 mpv-build/scripts/ffmpeg-config
+
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
             '--disable-programs' \
             '--disable-doc' \
-            '--enable-gnutls' \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
@@ -375,12 +381,17 @@ jobs:
       - name: Write ffmpeg_options (x86_64)
         run: |
           cd mpv-build
+          BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+          # Insert PKG_CONFIG_PATH export right after the BUILD= line
+          sed -i '' "s|BUILD=\"\$(pwd)\"|BUILD=\"\$(pwd)\"\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"|" \
+          mpv-build/scripts/ffmpeg-config
+          echo "=== patched ffmpeg-config ==="
+          head -20 mpv-build/scripts/ffmpeg-config
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
             '--disable-programs' \
             '--disable-doc' \
-            '--enable-gnutls' \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
