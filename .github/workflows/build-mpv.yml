@@ -60,7 +60,8 @@ jobs:
             https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz
           cd gmp-6.3.0
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --disable-assembly --with-pic --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu)
           make install
           cd ..
@@ -70,11 +71,10 @@ jobs:
             https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz
           cd nettle-3.10
-          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --host=aarch64-apple-darwin \
-            --with-include-path="$(pwd)/../build_libs/include" \
-            --with-lib-path="$(pwd)/../build_libs/lib"
+            --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu)
           make install
           cd ..
@@ -84,7 +84,10 @@ jobs:
             https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz
           cd libidn2-2.3.7
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu)
           make install
           cd ..
@@ -95,6 +98,8 @@ jobs:
           tar -xf gnutls-3.8.9.tar.xz
           cd gnutls-3.8.9
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
             --host=aarch64-apple-darwin \
             --without-p11-kit \
@@ -193,7 +198,8 @@ jobs:
             https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz
           cd gmp-6.3.0
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --disable-assembly --with-pic
           make -j$(sysctl -n hw.logicalcpu)
           make install
           cd ..
@@ -203,10 +209,9 @@ jobs:
             https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz
           cd nettle-3.10
-          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --with-include-path="$(pwd)/../build_libs/include" \
-            --with-lib-path="$(pwd)/../build_libs/lib"
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
           make -j$(sysctl -n hw.logicalcpu)
           make install
           cd ..
@@ -216,6 +221,8 @@ jobs:
             https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz
           cd libidn2-2.3.7
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib" \
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
           make -j$(sysctl -n hw.logicalcpu)
           make install
@@ -227,6 +234,8 @@ jobs:
           tar -xf gnutls-3.8.9.tar.xz
           cd gnutls-3.8.9
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          CPPFLAGS="-I$(pwd)/../build_libs/include" \
+          LDFLAGS="-L$(pwd)/../build_libs/lib" \
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
             --without-p11-kit \
             --disable-doc --disable-tests --disable-tools \
