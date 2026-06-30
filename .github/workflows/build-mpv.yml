@@ -174,7 +174,7 @@ jobs:
         run: |
           mkdir -p package/include
           cp dist/libmpv.dylib package/libmpv.dylib
-          cp -r include/mpv package/include/mpv
+          cp -r "${{ github.workspace }}/include/mpv" package/include/mpv
 
           cd package
           zip -r ../libmpv-macos.zip libmpv.dylib include/
