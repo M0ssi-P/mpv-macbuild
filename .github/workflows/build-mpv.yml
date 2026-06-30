@@ -51,6 +51,7 @@ jobs:
             "FRIBIDI_LIBS=-L$BUILD_LIBS/lib -lfribidi" \
             "HARFBUZZ_CFLAGS=-I$BUILD_LIBS/include/harfbuzz" \
             "HARFBUZZ_LIBS=-L$BUILD_LIBS/lib -lharfbuzz" \
+            "AM_CFLAGS=-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
@@ -264,6 +265,7 @@ jobs:
             "FRIBIDI_LIBS=-L$BUILD_LIBS/lib -lfribidi" \
             "HARFBUZZ_CFLAGS=-I$BUILD_LIBS/include/harfbuzz" \
             "HARFBUZZ_LIBS=-L$BUILD_LIBS/lib -lharfbuzz" \
+            "AM_CFLAGS=-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
