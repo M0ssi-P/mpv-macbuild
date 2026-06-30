@@ -45,6 +45,8 @@ jobs:
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
+            "FREETYPE_CFLAGS=-I$BUILD_LIBS/include/freetype2" \
+            "FREETYPE_LIBS=-L$BUILD_LIBS/lib -lfreetype -lz -lbz2 -lharfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
@@ -252,6 +254,8 @@ jobs:
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
+            "FREETYPE_CFLAGS=-I$BUILD_LIBS/include/freetype2" \
+            "FREETYPE_LIBS=-L$BUILD_LIBS/lib -lfreetype -lz -lbz2 -lharfbuzz" \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
