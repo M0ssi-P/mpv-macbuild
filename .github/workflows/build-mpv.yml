@@ -56,7 +56,8 @@ jobs:
           export LDFLAGS="-arch arm64"
 
           # GMP
-          curl -LO https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          curl -L --retry 3 --retry-delay 5 -o gmp-6.3.0.tar.xz \
+            https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz
           cd gmp-6.3.0
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
@@ -65,7 +66,8 @@ jobs:
           cd ..
 
           # Nettle
-          curl -LO https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          curl -L --retry 3 --retry-delay 5 -o nettle-3.10.tar.gz \
+            https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz
           cd nettle-3.10
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
@@ -78,7 +80,8 @@ jobs:
           cd ..
 
           # libidn2
-          curl -LO https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          curl -L --retry 3 --retry-delay 5 -o libidn2-2.3.7.tar.gz \
+            https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz
           cd libidn2-2.3.7
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
@@ -87,7 +90,8 @@ jobs:
           cd ..
 
           # GnuTLS
-          curl -LO https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          curl -L --retry 3 --retry-delay 5 -o gnutls-3.8.9.tar.xz \
+            https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
           tar -xf gnutls-3.8.9.tar.xz
           cd gnutls-3.8.9
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
@@ -185,7 +189,8 @@ jobs:
           cd mpv-build
 
           # GMP
-          curl -LO https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          curl -L --retry 3 --retry-delay 5 -o gmp-6.3.0.tar.xz \
+            https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz
           cd gmp-6.3.0
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
@@ -194,7 +199,8 @@ jobs:
           cd ..
 
           # Nettle
-          curl -LO https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          curl -L --retry 3 --retry-delay 5 -o nettle-3.10.tar.gz \
+            https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz
           cd nettle-3.10
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
@@ -206,7 +212,8 @@ jobs:
           cd ..
 
           # libidn2
-          curl -LO https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          curl -L --retry 3 --retry-delay 5 -o libidn2-2.3.7.tar.gz \
+            https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz
           cd libidn2-2.3.7
           ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
@@ -215,7 +222,8 @@ jobs:
           cd ..
 
           # GnuTLS
-          curl -LO https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          curl -L --retry 3 --retry-delay 5 -o gnutls-3.8.9.tar.xz \
+            https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
           tar -xf gnutls-3.8.9.tar.xz
           cd gnutls-3.8.9
           PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
