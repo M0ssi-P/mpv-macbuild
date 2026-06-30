@@ -91,7 +91,7 @@ jobs:
           CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
           ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
             --host=aarch64-apple-darwin --without-p11-kit \
-            --disable-doc --disable-tests --disable-tools --with-included-unistring
+            --disable-doc --disable-tests --disable-tools --with-included-unistring. --with-included-libtasn1
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
@@ -277,7 +277,7 @@ jobs:
           tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
           CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
           ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring
+            --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring --with-included-libtasn1
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
