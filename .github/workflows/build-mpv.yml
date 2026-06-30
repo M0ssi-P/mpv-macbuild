@@ -18,6 +18,7 @@ jobs:
       - name: Install Build Prerequisites
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
+
       - name: Clone mpv-build & Write Options
         run: |
           git clone https://github.com/mpv-player/mpv-build.git
@@ -39,26 +40,85 @@ jobs:
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
-            '--disable-programs' \
-            '--disable-doc' \
-            > ffmpeg_options
-
-          printf '%s\n' \
-            '--disable-shared' \
-            '--enable-static' \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
-          echo "=== ffmpeg_options ===" && cat ffmpeg_options
           echo "=== libass_options ===" && cat libass_options
 
           ./update
+
+      - name: Build static GnuTLS and its dependencies (arm64)
+        run: |
+          cd mpv-build
+
+          export CFLAGS="-arch arm64"
+          export CXXFLAGS="-arch arm64"
+          export LDFLAGS="-arch arm64"
+
+          # GMP
+          curl -LO https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          tar -xf gmp-6.3.0.tar.xz
+          cd gmp-6.3.0
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # Nettle
+          curl -LO https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          tar -xf nettle-3.10.tar.gz
+          cd nettle-3.10
+          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --host=aarch64-apple-darwin \
+            --with-include-path="$(pwd)/../build_libs/include" \
+            --with-lib-path="$(pwd)/../build_libs/lib"
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # libidn2
+          curl -LO https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          tar -xf libidn2-2.3.7.tar.gz
+          cd libidn2-2.3.7
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static --host=aarch64-apple-darwin
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # GnuTLS
+          curl -LO https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          tar -xf gnutls-3.8.9.tar.xz
+          cd gnutls-3.8.9
+          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --host=aarch64-apple-darwin \
+            --without-p11-kit \
+            --disable-doc --disable-tests --disable-tools \
+            --with-included-unistring
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+      - name: Write ffmpeg_options (arm64)
+        run: |
+          cd mpv-build
+          printf '%s\n' \
+            '--disable-shared' \
+            '--enable-static' \
+            '--disable-programs' \
+            '--disable-doc' \
+            '--enable-gnutls' \
+            '--extra-cflags=-I../build_libs/include' \
+            '--extra-ldflags=-L../build_libs/lib' \
+            > ffmpeg_options
+          echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
       - name: Build arm64 Slice
         run: |
           cd mpv-build
           ./clean
-          rm -rf mpv/build build_libs
+          rm -rf mpv/build
 
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
@@ -69,6 +129,10 @@ jobs:
 
           mkdir -p ../dist/arm64
           cp mpv/build/libmpv.dylib ../dist/arm64/libmpv.dylib
+
+          echo "=== Checking for external (non-system) dependencies ==="
+          otool -L ../dist/arm64/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
+            && echo "WARNING: external deps found above" || echo "OK: no external deps"
 
       - name: Upload arm64 Slice
         uses: actions/upload-artifact@v4
@@ -109,26 +173,79 @@ jobs:
           printf '%s\n' \
             '--disable-shared' \
             '--enable-static' \
-            '--disable-programs' \
-            '--disable-doc' \
-            > ffmpeg_options
-
-          printf '%s\n' \
-            '--disable-shared' \
-            '--enable-static' \
             > libass_options
 
           echo "=== mpv_options ===" && cat mpv_options
-          echo "=== ffmpeg_options ===" && cat ffmpeg_options
           echo "=== libass_options ===" && cat libass_options
 
           ./update
+
+      - name: Build static GnuTLS and its dependencies (x86_64)
+        run: |
+          cd mpv-build
+
+          # GMP
+          curl -LO https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+          tar -xf gmp-6.3.0.tar.xz
+          cd gmp-6.3.0
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # Nettle
+          curl -LO https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          tar -xf nettle-3.10.tar.gz
+          cd nettle-3.10
+          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --with-include-path="$(pwd)/../build_libs/include" \
+            --with-lib-path="$(pwd)/../build_libs/lib"
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # libidn2
+          curl -LO https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          tar -xf libidn2-2.3.7.tar.gz
+          cd libidn2-2.3.7
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+          # GnuTLS
+          curl -LO https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          tar -xf gnutls-3.8.9.tar.xz
+          cd gnutls-3.8.9
+          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
+          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+            --without-p11-kit \
+            --disable-doc --disable-tests --disable-tools \
+            --with-included-unistring
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+          cd ..
+
+      - name: Write ffmpeg_options (x86_64)
+        run: |
+          cd mpv-build
+          printf '%s\n' \
+            '--disable-shared' \
+            '--enable-static' \
+            '--disable-programs' \
+            '--disable-doc' \
+            '--enable-gnutls' \
+            '--extra-cflags=-I../build_libs/include' \
+            '--extra-ldflags=-L../build_libs/lib' \
+            > ffmpeg_options
+          echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
       - name: Build x86_64 Slice
         run: |
           cd mpv-build
           ./clean
-          rm -rf mpv/build build_libs
+          rm -rf mpv/build
 
           ./build -j$(sysctl -n hw.logicalcpu)
 
@@ -136,6 +253,10 @@ jobs:
 
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
+
+          echo "=== Checking for external (non-system) dependencies ==="
+          otool -L ../dist/x86_64/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
+            && echo "WARNING: external deps found above" || echo "OK: no external deps"
 
       - name: Upload x86_64 Slice
         uses: actions/upload-artifact@v4
@@ -149,13 +270,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
       - name: Download Slices
         uses: actions/download-artifact@v4
         with:
           path: dist
 
-      - name: Assemble Universal Binaryx
+      - name: Assemble Universal Binary
         run: |
           lipo -create \
             -output dist/libmpv.dylib \
@@ -169,7 +290,8 @@ jobs:
 
           lipo -archs dist/libmpv.dylib
 
-          otool -L dist/libmpv.dylib | grep -E "libav|libsw|libass" \
+          echo "=== Final check — no external runtime dependencies ==="
+          otool -L dist/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
             && echo "FAIL: external deps found" && exit 1 \
             || echo "OK: self-contained"
 
@@ -185,7 +307,6 @@ jobs:
 
           echo "=== libmpv-macos.zip contents ==="
           unzip -l libmpv-macos.zip
-
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
