@@ -75,7 +75,7 @@ jobs:
           path: dist/arm64/libmpv.dylib
 
   build-x86_64:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
