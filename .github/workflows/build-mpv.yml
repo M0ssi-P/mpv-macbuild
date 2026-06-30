@@ -51,13 +51,13 @@ jobs:
       - name: Build static dependency chain (arm64)
         run: |
           cd mpv-build
+          BUILD_LIBS="$(pwd)/build_libs"
 
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
           export LDFLAGS="-arch arm64"
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
-          BUILD_LIBS="$(pwd)/build_libs"
 
           dl() { curl -L --retry 3 --retry-delay 5 -o "$1" "$2"; }
 
@@ -133,9 +133,14 @@ jobs:
           # ---- fontconfig ----
           dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
           tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+
+          CPPFLAGS="-I$BUILD_LIBS/include" \
+          LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          PKG_CONFIG="$(which pkg-config)" \
+          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
           ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
             --disable-docs --disable-nls
+            
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
@@ -344,6 +349,16 @@ jobs:
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
+
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR"
+
+          find "$BUILD_LIBS" -name "*.pc"
+
+          pkg-config --list-all | grep freetype
+          pkg-config --modversion freetype2
+          pkg-config --cflags freetype2
+          pkg-config --libs freetype2
 
       - name: Write ffmpeg_options (x86_64)
         run: |
