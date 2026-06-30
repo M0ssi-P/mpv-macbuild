@@ -17,7 +17,7 @@ jobs:
 
       - name: Install Build Prerequisites
         run: |
-          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz
+          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja cmake
 
       - name: Clone mpv-build & Write Options
         run: |
@@ -35,6 +35,7 @@ jobs:
             '-Dmacos-cocoa-cb=disabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
+            '-Dx11=disabled' \
             > mpv_options
 
           printf '%s\n' \
@@ -47,66 +48,110 @@ jobs:
 
           ./update
 
-      - name: Build static GnuTLS and its dependencies (arm64)
+      - name: Build static dependency chain (arm64)
         run: |
           cd mpv-build
 
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
           export LDFLAGS="-arch arm64"
+          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
+          export PKG_CONFIG_PATH=""
+          BUILD_LIBS="$(pwd)/build_libs"
 
-          # GMP
-          curl -L --retry 3 --retry-delay 5 -o gmp-6.3.0.tar.xz \
-            https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
-          tar -xf gmp-6.3.0.tar.xz
-          cd gmp-6.3.0
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+          dl() { curl -L --retry 3 --retry-delay 5 -o "$1" "$2"; }
+
+          # ---- GMP ----
+          dl gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+          tar -xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
             --disable-assembly --with-pic --host=aarch64-apple-darwin
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # Nettle
-          curl -L --retry 3 --retry-delay 5 -o nettle-3.10.tar.gz \
-            https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
-          tar -xf nettle-3.10.tar.gz
-          cd nettle-3.10
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --host=aarch64-apple-darwin
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- Nettle ----
+          dl nettle-3.10.tar.gz https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          tar -xf nettle-3.10.tar.gz && cd nettle-3.10
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # libidn2
-          curl -L --retry 3 --retry-delay 5 -o libidn2-2.3.7.tar.gz \
-            https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
-          tar -xf libidn2-2.3.7.tar.gz
-          cd libidn2-2.3.7
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --host=aarch64-apple-darwin
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- libidn2 ----
+          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # GnuTLS
-          curl -L --retry 3 --retry-delay 5 -o gnutls-3.8.9.tar.xz \
-            https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
-          tar -xf gnutls-3.8.9.tar.xz
-          cd gnutls-3.8.9
-          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib -arch arm64" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --host=aarch64-apple-darwin \
-            --without-p11-kit \
-            --disable-doc --disable-tests --disable-tools \
-            --with-included-unistring
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- GnuTLS ----
+          dl gnutls-3.8.9.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
+            --host=aarch64-apple-darwin --without-p11-kit \
+            --disable-doc --disable-tests --disable-tools --with-included-unistring
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- freetype ----
+          dl freetype-2.13.3.tar.xz https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
+          tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
+            --without-harfbuzz
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- fribidi ----
+          dl fribidi-1.0.16.tar.xz https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
+          tar -xf fribidi-1.0.16.tar.xz && cd fribidi-1.0.16
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
+            --disable-docs
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- harfbuzz (needs freetype, built again with harfbuzz support for the loop) ----
+          dl harfbuzz-9.0.0.tar.xz https://github.com/harfbuzz/harfbuzz/releases/download/9.0.0/harfbuzz-9.0.0.tar.xz
+          tar -xf harfbuzz-9.0.0.tar.xz && cd harfbuzz-9.0.0
+          CXXFLAGS="-arch arm64" \
+          meson setup build --prefix="$BUILD_LIBS" --default-library=static \
+            -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
+          ninja -C build -j$(sysctl -n hw.logicalcpu)
+          ninja -C build install
+          cd ..
+
+          # ---- rebuild freetype WITH harfbuzz now that harfbuzz exists (avoids circular dep issue) ----
+          rm -rf freetype-2.13.3 && tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
+            --with-harfbuzz=yes
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- fontconfig ----
+          dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
+          tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
+            --disable-docs --disable-nls
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- lcms2 ----
+          dl lcms2-2.16.tar.gz https://github.com/mm2/Little-CMS/releases/download/lcms2.16/lcms2-2.16.tar.gz
+          tar -xf lcms2-2.16.tar.gz && cd lcms2-2.16
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- libjpeg-turbo ----
+          dl ljt-3.0.4.tar.gz https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.4.tar.gz
+          tar -xf ljt-3.0.4.tar.gz && cd libjpeg-turbo-3.0.4
+          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
       - name: Write ffmpeg_options (arm64)
@@ -132,6 +177,9 @@ jobs:
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
           export LDFLAGS="-arch arm64"
+          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
+          export PKG_CONFIG_PATH=""
+
           ./build -j$(sysctl -n hw.logicalcpu)
 
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
@@ -157,7 +205,7 @@ jobs:
 
       - name: Install Build Prerequisites
         run: |
-          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja fribidi harfbuzz nasm
+          brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja cmake nasm
           which nasm
           nasm -v
 
@@ -177,6 +225,7 @@ jobs:
             '-Dmacos-cocoa-cb=disabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
+            '-Dx11=disabled' \
             > mpv_options
 
           printf '%s\n' \
@@ -189,59 +238,101 @@ jobs:
 
           ./update
 
-      - name: Build static GnuTLS and its dependencies (x86_64)
+      - name: Build static dependency chain (x86_64)
         run: |
           cd mpv-build
 
-          # GMP
-          curl -L --retry 3 --retry-delay 5 -o gmp-6.3.0.tar.xz \
-            https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
-          tar -xf gmp-6.3.0.tar.xz
-          cd gmp-6.3.0
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
+          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
+          export PKG_CONFIG_PATH=""
+          BUILD_LIBS="$(pwd)/build_libs"
+
+          dl() { curl -L --retry 3 --retry-delay 5 -o "$1" "$2"; }
+
+          # ---- GMP ----
+          dl gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+          tar -xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
             --disable-assembly --with-pic
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # Nettle
-          curl -L --retry 3 --retry-delay 5 -o nettle-3.10.tar.gz \
-            https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
-          tar -xf nettle-3.10.tar.gz
-          cd nettle-3.10
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- Nettle ----
+          dl nettle-3.10.tar.gz https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
+          tar -xf nettle-3.10.tar.gz && cd nettle-3.10
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # libidn2
-          curl -L --retry 3 --retry-delay 5 -o libidn2-2.3.7.tar.gz \
-            https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
-          tar -xf libidn2-2.3.7.tar.gz
-          cd libidn2-2.3.7
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- libidn2 ----
+          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # GnuTLS
-          curl -L --retry 3 --retry-delay 5 -o gnutls-3.8.9.tar.xz \
-            https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
-          tar -xf gnutls-3.8.9.tar.xz
-          cd gnutls-3.8.9
-          PKG_CONFIG_PATH="$(pwd)/../build_libs/lib/pkgconfig" \
-          CPPFLAGS="-I$(pwd)/../build_libs/include" \
-          LDFLAGS="-L$(pwd)/../build_libs/lib" \
-          ./configure --prefix="$(pwd)/../build_libs" --disable-shared --enable-static \
-            --without-p11-kit \
-            --disable-doc --disable-tests --disable-tools \
-            --with-included-unistring
-          make -j$(sysctl -n hw.logicalcpu)
-          make install
+          # ---- GnuTLS ----
+          dl gnutls-3.8.9.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+          tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
+            --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- freetype (without harfbuzz first) ----
+          dl freetype-2.13.3.tar.xz https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
+          tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --without-harfbuzz
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- fribidi ----
+          dl fribidi-1.0.16.tar.xz https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
+          tar -xf fribidi-1.0.16.tar.xz && cd fribidi-1.0.16
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-docs
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- harfbuzz ----
+          dl harfbuzz-9.0.0.tar.xz https://github.com/harfbuzz/harfbuzz/releases/download/9.0.0/harfbuzz-9.0.0.tar.xz
+          tar -xf harfbuzz-9.0.0.tar.xz && cd harfbuzz-9.0.0
+          meson setup build --prefix="$BUILD_LIBS" --default-library=static \
+            -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
+          ninja -C build -j$(sysctl -n hw.logicalcpu)
+          ninja -C build install
+          cd ..
+
+          # ---- rebuild freetype WITH harfbuzz ----
+          rm -rf freetype-2.13.3 && tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --with-harfbuzz=yes
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- fontconfig ----
+          dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
+          tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-docs --disable-nls
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- lcms2 ----
+          dl lcms2-2.16.tar.gz https://github.com/mm2/Little-CMS/releases/download/lcms2.16/lcms2-2.16.tar.gz
+          tar -xf lcms2-2.16.tar.gz && cd lcms2-2.16
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
+          # ---- libjpeg-turbo ----
+          dl ljt-3.0.4.tar.gz https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.4.tar.gz
+          tar -xf ljt-3.0.4.tar.gz && cd libjpeg-turbo-3.0.4
+          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
+          make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
       - name: Write ffmpeg_options (x86_64)
@@ -263,6 +354,9 @@ jobs:
           cd mpv-build
           ./clean
           rm -rf mpv/build
+
+          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
+          export PKG_CONFIG_PATH=""
 
           ./build -j$(sysctl -n hw.logicalcpu)
 
@@ -301,10 +395,8 @@ jobs:
             dist/libmpv-x86_64/libmpv.dylib
 
           install_name_tool -id "@rpath/libmpv.dylib" dist/libmpv.dylib
-
           xattr -cr dist/libmpv.dylib
           codesign --force -s - dist/libmpv.dylib
-
           lipo -archs dist/libmpv.dylib
 
           echo "=== Final check — no external runtime dependencies ==="
