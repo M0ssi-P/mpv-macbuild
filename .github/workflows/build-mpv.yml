@@ -27,6 +27,8 @@ jobs:
           ./use-ffmpeg-master
           ./use-libass-master
 
+          BUILD_LIBS="$(pwd)/build_libs"
+
           printf '%s\n' \
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
@@ -36,6 +38,8 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
+            "-Dextra_cflags=-I$BUILD_LIBS/include -arch arm64" \
+            "-Dextra_ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > mpv_options
 
           printf '%s\n' \
@@ -178,8 +182,8 @@ jobs:
             '--disable-programs' \
             '--disable-doc' \
             '--enable-gnutls' \
-            '--extra-cflags=-I../build_libs/include' \
-            '--extra-ldflags=-L../build_libs/lib' \
+            "--extra-cflags=-I$BUILD_LIBS/include -arch arm64" \
+            "--extra-ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
@@ -189,16 +193,14 @@ jobs:
           ./clean
           rm -rf mpv/build
 
-          export CFLAGS="-arch arm64"
-          export CXXFLAGS="-arch arm64"
-          export LDFLAGS="-arch arm64"
-          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
-          export PKG_CONFIG_PATH="$(pwd)/build_libs/lib/pkgconfig"
-
+          BUILD_LIBS="$(pwd)/build_libs"
+          
+          # Force the pkg-config directories directly inline on execution
+          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
+          PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig" \
           ./build -j$(sysctl -n hw.logicalcpu)
-
+          
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
-
           mkdir -p ../dist/arm64
           cp mpv/build/libmpv.dylib ../dist/arm64/libmpv.dylib
 
@@ -232,6 +234,8 @@ jobs:
           ./use-ffmpeg-master
           ./use-libass-master
 
+          BUILD_LIBS="$(pwd)/build_libs"
+
           printf '%s\n' \
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
@@ -241,6 +245,8 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
+            "-Dextra_cflags=-I$BUILD_LIBS/include -arch arm64" \
+            "-Dextra_ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > mpv_options
 
           printf '%s\n' \
@@ -330,8 +336,15 @@ jobs:
           # ---- fontconfig ----
           dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
           tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-docs --disable-nls
+          
+          # Force the compiler flags directly to skip pkg-config validation
+          CPPFLAGS="-I$BUILD_LIBS/include" \
+          LDFLAGS="-L$BUILD_LIBS/lib" \
+          FREETYPE_CFLAGS="-I$BUILD_LIBS/include/freetype2" \
+          FREETYPE_LIBS="-L$BUILD_LIBS/lib -lfribidi -lharfbuzz -lfreetype" \
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
+            --disable-docs --disable-nls
+            
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
@@ -369,8 +382,8 @@ jobs:
             '--disable-programs' \
             '--disable-doc' \
             '--enable-gnutls' \
-            '--extra-cflags=-I../build_libs/include' \
-            '--extra-ldflags=-L../build_libs/lib' \
+            "--extra-cflags=-I$BUILD_LIBS/include -arch arm64" \
+            "--extra-ldflags=-L$BUILD_LIBS/lib -arch arm64" \
             > ffmpeg_options
           echo "=== ffmpeg_options ===" && cat ffmpeg_options
 
@@ -380,13 +393,14 @@ jobs:
           ./clean
           rm -rf mpv/build
 
-          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
-          export PKG_CONFIG_PATH=""
-
+          BUILD_LIBS="$(pwd)/build_libs"
+          
+          # Pass paths explicitly inline to the build execution
+          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
+          PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig" \
           ./build -j$(sysctl -n hw.logicalcpu)
-
+          
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
-
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
 
