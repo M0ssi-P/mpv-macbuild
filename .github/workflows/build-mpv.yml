@@ -170,9 +170,23 @@ jobs:
             && echo "FAIL: external deps found" && exit 1 \
             || echo "OK: self-contained"
 
+      - name: Assemble package — libmpv.dylib + include/mpv/*.h
+        run: |
+          mkdir -p package/include
+          cp dist/libmpv.dylib package/libmpv.dylib
+          cp -r include/mpv package/include/mpv
+
+          cd package
+          zip -r ../libmpv-macos.zip libmpv.dylib include/
+          cd ..
+
+          echo "=== libmpv-macos.zip contents ==="
+          unzip -l libmpv-macos.zip
+
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/libmpv.dylib
+          files: libmpv-macos.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
