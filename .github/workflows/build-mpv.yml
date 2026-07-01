@@ -417,6 +417,12 @@ jobs:
           rm -rf ffmpeg_build
     
           BUILD_LIBS="$(pwd)/build_libs"
+
+          # Sanitize any malformed linker options inside our static build metadata for x86_64
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreFoundation/-framework CoreFoundation/g' {} +
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreServices/-framework CoreServices/g' {} +
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,-framework//g' {} +
+
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
           export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
