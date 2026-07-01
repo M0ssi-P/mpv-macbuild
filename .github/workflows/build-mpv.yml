@@ -370,7 +370,7 @@ jobs:
           export CXXFLAGS="-arch x86_64"
     
           # CRITICAL IMMUNITY PASS FOR INTEL HOUSES:
-          export LDFLAGS="-arch x86_64 -L$BUILD_LIBS/lib -Wl,-search_paths_first $BUILD_LIBS/lib/libfontconfig.a $BUILD_LIBS/lib/libfreetype.a $BUILD_LIBS/lib/libharfbuzz.a $BUILD_LIBS/lib/libfribidi.a -framework CoreFoundation -framework CoreServices -framework Security"
+          export LDFLAGS="-arch x86_64 -L$BUILD_LIBS/lib -Wl,-search_paths_first -Wl,-force_load,$BUILD_LIBS/lib/libfontconfig.a -Wl,-force_load,$BUILD_LIBS/lib/libfreetype.a -Wl,-force_load,$BUILD_LIBS/lib/libharfbuzz.a -Wl,-force_load,$BUILD_LIBS/lib/libfribidi.a -framework CoreFoundation -framework CoreServices -framework Security"
     
           ./build -j$(sysctl -n hw.logicalcpu)
     
