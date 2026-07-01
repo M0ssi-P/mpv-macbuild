@@ -345,7 +345,7 @@ jobs:
           cd ..
 
       - name: Debug GnuTLS pkg-config resolution (x86_64)
-          run: |
+        run: |
             BUILD_LIBS="$(pwd)/mpv-build/build_libs"
             export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
             export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
