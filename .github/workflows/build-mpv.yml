@@ -46,32 +46,12 @@ jobs:
 
           ./update
 
-      - name: Completely Remove macOS Clipboard Backend from Source & Registry
+      - name: Patch out macOS clipboard backend reference in registry
         run: |
-          # 1. Remove the file implementation from the build definition
-          # This prevents meson from looking for the .m / Swift-tied file
-          SED_EXT=""
-          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
-    
-          TARGET_MESON="mpv-build/mpv/meson.build"
-          sed -i $SED_EXT '/clipboard-mac.m/d' "$TARGET_MESON"
-
-          # 2. Unregister the backend from mpv's internal clipboard array
-          TARGET_CLIPBOARD="mpv-build/mpv/player/clipboard/clipboard.c"
-    
-          echo "Pre-patch check for macos backend reference:"
-          grep -n "clipboard_backend_mac" "$TARGET_CLIPBOARD" || true
-    
-          # Remove the registry line entirely so mpv never knows it existed
-          sed -i $SED_EXT '/&clipboard_backend_mac/d' "$TARGET_CLIPBOARD"
-    
-          echo "Post-patch verification:"
-          if grep -q "clipboard_backend_mac" "$TARGET_CLIPBOARD"; then
-            echo "CRITICAL ERROR: clipboard_backend_mac entry is still present in registry!"
-            exit 1
-          else
-            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
-          fi
+          TARGET="mpv-build/mpv/player/clipboard/clipboard.c"
+          grep -n "clipboard_backend_mac" "$TARGET"   # inspect first, then remove the array entry
+          sed -i '' '/clipboard_backend_mac/d' "$TARGET"
+          grep -q "clipboard_backend_mac" "$TARGET" && { echo "CRITICAL ERROR: entry still present"; exit 1; } || echo "SUCCESS: mac backend unregistered"
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
@@ -276,32 +256,12 @@ jobs:
 
           ./update
 
-      - name: Completely Remove macOS Clipboard Backend from Source & Registry
+      - name: Patch out macOS clipboard backend reference in registry
         run: |
-          # 1. Remove the file implementation from the build definition
-          # This prevents meson from looking for the .m / Swift-tied file
-          SED_EXT=""
-          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
-    
-          TARGET_MESON="mpv-build/mpv/meson.build"
-          sed -i $SED_EXT '/clipboard-mac.m/d' "$TARGET_MESON"
-
-          # 2. Unregister the backend from mpv's internal clipboard array
-          TARGET_CLIPBOARD="mpv-build/mpv/player/clipboard/clipboard.c"
-    
-          echo "Pre-patch check for macos backend reference:"
-          grep -n "clipboard_backend_mac" "$TARGET_CLIPBOARD" || true
-    
-          # Remove the registry line entirely so mpv never knows it existed
-          sed -i $SED_EXT '/&clipboard_backend_mac/d' "$TARGET_CLIPBOARD"
-    
-          echo "Post-patch verification:"
-          if grep -q "clipboard_backend_mac" "$TARGET_CLIPBOARD"; then
-            echo "CRITICAL ERROR: clipboard_backend_mac entry is still present in registry!"
-            exit 1
-          else
-            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
-          fi
+          TARGET="mpv-build/mpv/player/clipboard/clipboard.c"
+          grep -n "clipboard_backend_mac" "$TARGET"   # inspect first, then remove the array entry
+          sed -i '' '/clipboard_backend_mac/d' "$TARGET"
+          grep -q "clipboard_backend_mac" "$TARGET" && { echo "CRITICAL ERROR: entry still present"; exit 1; } || echo "SUCCESS: mac backend unregistered"
 
       - name: Total Lockout - Purge Homebrew Store (Intel only)
         run: |
