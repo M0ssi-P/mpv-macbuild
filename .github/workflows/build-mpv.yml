@@ -411,18 +411,21 @@ jobs:
       - name: Build x86_64 Slice
         run: |
           cd mpv-build
-          rm -rf mpv/build          # only wipe mpv's meson build
-          rm -rf libass/.libs       # wipe libass's previous build if any
-          rm -rf libplacebo/build   # wipe libplacebo's previous build if any
-          # DO NOT run ./clean — it deletes build_libs and destroys our pre-built deps
-
+          rm -rf mpv/build
+          rm -rf libass/.libs
+          rm -rf libplacebo/build
+          rm -rf ffmpeg_build
+    
           BUILD_LIBS="$(pwd)/build_libs"
-          
-          # Pass paths explicitly inline to the build execution
-          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
-          PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig" \
+          export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
+          export LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64"
+          export CFLAGS="-arch x86_64"
+          export CXXFLAGS="-arch x86_64"
+    
           ./build -j$(sysctl -n hw.logicalcpu)
-          
+    
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
