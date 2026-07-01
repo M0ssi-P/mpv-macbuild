@@ -64,6 +64,13 @@ jobs:
 
           echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
 
+      - name: Inject Clipboard Linker Stub for Java dlopen Satisfaction
+        run: |
+          # Append a blank symbol to language-mac.c so System.load() can find it
+          echo "" >> mpv-build/mpv/osdep/language-mac.c
+          echo "struct clipboard_backend { const char *name; void *placeholder[10]; };" >> mpv-build/mpv/osdep/language-mac.c
+          echo "const struct clipboard_backend clipboard_backend_mac = { .name = \"macos_stub\" };" >> mpv-build/mpv/osdep/language-mac.c
+
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
           BUILD_LIBS="$(pwd)/mpv-build/build_libs"
@@ -284,6 +291,13 @@ jobs:
           fi
 
           echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
+
+      - name: Inject Clipboard Linker Stub for Java dlopen Satisfaction
+        run: |
+          # Append a blank symbol to language-mac.c so System.load() can find it
+          echo "" >> mpv-build/mpv/osdep/language-mac.c
+          echo "struct clipboard_backend { const char *name; void *placeholder[10]; };" >> mpv-build/mpv/osdep/language-mac.c
+          echo "const struct clipboard_backend clipboard_backend_mac = { .name = \"macos_stub\" };" >> mpv-build/mpv/osdep/language-mac.c
 
       - name: Total Lockout - Purge Homebrew Store (Intel only)
         run: |
