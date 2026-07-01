@@ -37,6 +37,7 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
+            '-Dapple-clipboard=disabled' \
             > mpv_options
 
           printf '%s\n' \
@@ -240,6 +241,7 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
+            '-Dapple-clipboard=disabled' \
             > mpv_options
 
           printf '%s\n' \
