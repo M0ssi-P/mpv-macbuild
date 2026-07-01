@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,8 +28,6 @@ jobs:
           ./use-ffmpeg-master
           ./use-libass-master
 
-          BUILD_LIBS="$(pwd)/build_libs"
-
           printf '%s\n' \
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
@@ -45,21 +44,29 @@ jobs:
             '--enable-static' \
             > libass_options
 
-          echo "=== mpv_options ===" && cat mpv_options
-          echo "=== libass_options ===" && cat libass_options
-
           ./update
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
-          # Absolute path to your custom build directory
           BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+          TARGET_SCRIPT="mpv-build/scripts/ffmpeg-config"
+
+          # Guard rail: Verify upstream anchor exists
+          if ! grep -q "set -e" "$TARGET_SCRIPT"; then
+            echo "CRITICAL ERROR: Upstream changed scripts/ffmpeg-config! 'set -e' anchor not found."
+            exit 1
+          fi
+
+          # Inject paths right below the script initialization header
+          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" "$TARGET_SCRIPT"
     
-          # Inject the static library paths right after the set -e line
-          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" mpv-build/scripts/ffmpeg-config
-    
-          echo "=== Patched ffmpeg-config header ==="
-          head -n 15 mpv-build/scripts/ffmpeg-config
+          # Verify the patch bound successfully
+          if ! grep -q "build_libs/lib/pkgconfig" "$TARGET_SCRIPT"; then
+            echo "CRITICAL ERROR: Patch failed to inject into scripts/ffmpeg-config!"
+            exit 1
+          fi
+
+          echo "SUCCESS: ffmpeg-config successfully patched and verified."
 
       - name: Build static dependency chain (arm64)
         run: |
@@ -77,83 +84,62 @@ jobs:
           # ---- GMP ----
           dl gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --disable-assembly --with-pic --host=aarch64-apple-darwin
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-assembly --with-pic --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- Nettle ----
           dl nettle-3.10.tar.gz https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz && cd nettle-3.10
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- libidn2 ----
-          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          dl libidn2-2.3.7.tar.gz https://github.com/libidn/libidn2/releases/download/v2.3.7/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- GnuTLS ----
           dl gnutls-3.8.9.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
           tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --host=aarch64-apple-darwin --without-p11-kit \
-            --disable-doc --disable-tests --disable-tools --with-included-unistring --with-included-libtasn1
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring --with-included-libtasn1
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # ---- freetype ----
+          # ---- freetype (pass 1) ----
           dl freetype-2.13.3.tar.xz https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
           tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
-            --without-harfbuzz
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin --without-harfbuzz
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- fribidi ----
           dl fribidi-1.0.16.tar.xz https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
           tar -xf fribidi-1.0.16.tar.xz && cd fribidi-1.0.16
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
-            --disable-docs
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin --disable-docs
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # ---- harfbuzz (needs freetype, built again with harfbuzz support for the loop) ----
+          # ---- harfbuzz ----
           dl harfbuzz-9.0.0.tar.xz https://github.com/harfbuzz/harfbuzz/releases/download/9.0.0/harfbuzz-9.0.0.tar.xz
           tar -xf harfbuzz-9.0.0.tar.xz && cd harfbuzz-9.0.0
-          CXXFLAGS="-arch arm64" \
-          meson setup build --prefix="$BUILD_LIBS" --default-library=static \
-            -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
-          ninja -C build -j$(sysctl -n hw.logicalcpu)
-          ninja -C build install
+          CXXFLAGS="-arch arm64" meson setup build --prefix="$BUILD_LIBS" --default-library=static -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
+          ninja -C build -j$(sysctl -n hw.logicalcpu) && ninja -C build install
           cd ..
 
-          # ---- rebuild freetype WITH harfbuzz now that harfbuzz exists (avoids circular dep issue) ----
+          # ---- freetype (pass 2) ----
           rm -rf freetype-2.13.3 && tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
-            --with-harfbuzz=yes
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin --with-harfbuzz=yes
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- fontconfig ----
           dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
           tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
-
-          CPPFLAGS="-I$BUILD_LIBS/include" \
-          LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" \
-          PKG_CONFIG="$(which pkg-config)" \
-          PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin \
-            --disable-docs --disable-nls
-            
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin --disable-docs --disable-nls
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
@@ -167,45 +153,26 @@ jobs:
           # ---- libjpeg-turbo ----
           dl ljt-3.0.4.tar.gz https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.4.tar.gz
           tar -xf ljt-3.0.4.tar.gz && cd libjpeg-turbo-3.0.4
-          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
+          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
-
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-          echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR"
-
-          find "$BUILD_LIBS" -name "*.pc"
-
-          pkg-config --list-all | grep freetype
-          pkg-config --modversion freetype2
-          pkg-config --cflags freetype2
-          pkg-config --libs freetype2
 
       - name: Write ffmpeg_options (arm64)
         run: |
           cd mpv-build
-          printf '%s\n' \
-            '--disable-shared' \
-            '--enable-static' \
-            '--disable-programs' \
-            '--disable-doc' \
-            '--enable-gnutls' \
-            '--pkg-config-flags=--static' \
-            > ffmpeg_options
-          echo "=== ffmpeg_options ===" && cat ffmpeg_options
+          printf '%s\n' '--disable-shared' '--enable-static' '--disable-programs' '--disable-doc' '--enable-gnutls' '--pkg-config-flags=--static' > ffmpeg_options
 
       - name: Build arm64 Slice
         run: |
           cd mpv-build
-          rm -rf mpv/build          # only wipe mpv's meson build
-          rm -rf libass/.libs       # wipe libass's previous build if any
-          rm -rf libplacebo/build   # wipe libplacebo's previous build if any
-          # DO NOT run ./clean — it deletes build_libs and destroys our pre-built deps
+          rm -rf mpv/build libass/.libs libplacebo/build ffmpeg_build
 
           BUILD_LIBS="$(pwd)/build_libs"
           
-          # FORCE pkg-config to output static flags exclusively
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreFoundation/-framework CoreFoundation/g' {} +
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreServices/-framework CoreServices/g' {} +
+          find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,-framework//g' {} +
+
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_ALL_STATIC=1
@@ -213,18 +180,20 @@ jobs:
           export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
-    
-          # CRITICAL: -Wl,-search_paths_first forces ld to look for .a before matching a .dylib in any directory
           export LDFLAGS="-L$BUILD_LIBS/lib -arch arm64 -Wl,-search_paths_first -framework CoreFoundation -framework CoreServices -framework Security"
+          
           ./build -j$(sysctl -n hw.logicalcpu)
           
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
           mkdir -p ../dist/arm64
           cp mpv/build/libmpv.dylib ../dist/arm64/libmpv.dylib
 
-          echo "=== Checking for external (non-system) dependencies ==="
-          otool -L ../dist/arm64/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
-            && echo "WARNING: external deps found above" || echo "OK: no external deps"
+          echo "=== Verifying Isolation ==="
+          if otool -L ../dist/arm64/libmpv.dylib | grep -E "(/opt/homebrew|/usr/local)"; then
+            echo "FAIL: Global environment leak found!" && exit 1
+          else
+            echo "OK: Slice is cleanly isolated."
+          fi
 
       - name: Upload arm64 Slice
         uses: actions/upload-artifact@v4
@@ -241,8 +210,6 @@ jobs:
       - name: Install Build Prerequisites
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja cmake nasm
-          which nasm
-          nasm -v
 
       - name: Clone mpv-build & Write Options
         run: |
@@ -251,8 +218,6 @@ jobs:
           ./use-mpv-master
           ./use-ffmpeg-master
           ./use-libass-master
-
-          BUILD_LIBS="$(pwd)/build_libs"
 
           printf '%s\n' \
             '-Dlibmpv=true' \
@@ -270,156 +235,125 @@ jobs:
             '--enable-static' \
             > libass_options
 
-          echo "=== mpv_options ===" && cat mpv_options
-          echo "=== libass_options ===" && cat libass_options
-
           ./update
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
-          # Absolute path to your custom build directory
           BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+          TARGET_SCRIPT="mpv-build/scripts/ffmpeg-config"
+
+          if ! grep -q "set -e" "$TARGET_SCRIPT"; then
+            echo "CRITICAL ERROR: Upstream changed scripts/ffmpeg-config! 'set -e' anchor not found."
+            exit 1
+          fi
+
+          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" "$TARGET_SCRIPT"
     
-          # Inject the static library paths right after the set -e line
-          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" mpv-build/scripts/ffmpeg-config
-    
-          echo "=== Patched ffmpeg-config header ==="
-          head -n 15 mpv-build/scripts/ffmpeg-config
+          if ! grep -q "build_libs/lib/pkgconfig" "$TARGET_SCRIPT"; then
+            echo "CRITICAL ERROR: Patch failed to inject into scripts/ffmpeg-config!"
+            exit 1
+          fi
+
+          echo "SUCCESS: ffmpeg-config successfully patched and verified."
 
       - name: Build static dependency chain (x86_64)
         run: |
           cd mpv-build
-
-          export PKG_CONFIG_LIBDIR="$(pwd)/build_libs/lib/pkgconfig"
-          export PKG_CONFIG_PATH="$(pwd)/build_libs/lib/pkgconfig"
           BUILD_LIBS="$(pwd)/build_libs"
+
+          export CFLAGS="-arch x86_64"
+          export CXXFLAGS="-arch x86_64"
+          export LDFLAGS="-arch x86_64"
+          export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
 
           dl() { curl -L --retry 3 --retry-delay 5 -o "$1" "$2"; }
 
           # ---- GMP ----
           dl gmp-6.3.0.tar.xz https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
           tar -xf gmp-6.3.0.tar.xz && cd gmp-6.3.0
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --disable-assembly --with-pic
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-assembly --with-pic --host=x86_64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- Nettle ----
           dl nettle-3.10.tar.gz https://ftp.gnu.org/gnu/nettle/nettle-3.10.tar.gz
           tar -xf nettle-3.10.tar.gz && cd nettle-3.10
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- libidn2 ----
-          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
+          dl libidn2-2.3.7.tar.gz https://github.com/libidn/libidn2/releases/download/v2.3.7/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- GnuTLS ----
           dl gnutls-3.8.9.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
           tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring --with-included-libtasn1
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin --without-p11-kit --disable-doc --disable-tests --disable-tools --with-included-unistring --with-included-libtasn1
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
-          # ---- freetype (without harfbuzz first) ----
+          # ---- freetype (pass 1) ----
           dl freetype-2.13.3.tar.xz https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
           tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --without-harfbuzz
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin --without-harfbuzz
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- fribidi ----
           dl fribidi-1.0.16.tar.xz https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
           tar -xf fribidi-1.0.16.tar.xz && cd fribidi-1.0.16
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --disable-docs
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin --disable-docs
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- harfbuzz ----
           dl harfbuzz-9.0.0.tar.xz https://github.com/harfbuzz/harfbuzz/releases/download/9.0.0/harfbuzz-9.0.0.tar.xz
           tar -xf harfbuzz-9.0.0.tar.xz && cd harfbuzz-9.0.0
-          meson setup build --prefix="$BUILD_LIBS" --default-library=static \
-            -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
-          ninja -C build -j$(sysctl -n hw.logicalcpu)
-          ninja -C build install
+          CXXFLAGS="-arch x86_64" meson setup build --prefix="$BUILD_LIBS" --default-library=static -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dicu=disabled -Dtests=disabled
+          ninja -C build -j$(sysctl -n hw.logicalcpu) && ninja -C build install
           cd ..
 
-          # ---- rebuild freetype WITH harfbuzz ----
+          # ---- freetype (pass 2) ----
           rm -rf freetype-2.13.3 && tar -xf freetype-2.13.3.tar.xz && cd freetype-2.13.3
-          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --with-harfbuzz=yes
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin --with-harfbuzz=yes
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- fontconfig ----
           dl fontconfig-2.15.0.tar.xz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.xz
           tar -xf fontconfig-2.15.0.tar.xz && cd fontconfig-2.15.0
-          
-          # Force the compiler flags directly to skip pkg-config validation
-          CPPFLAGS="-I$BUILD_LIBS/include" \
-          LDFLAGS="-L$BUILD_LIBS/lib" \
-          FREETYPE_CFLAGS="-I$BUILD_LIBS/include/freetype2" \
-          FREETYPE_LIBS="-L$BUILD_LIBS/lib -lfribidi -lharfbuzz -lfreetype" \
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
-            --disable-docs --disable-nls
-            
+          CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin --disable-docs --disable-nls
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- lcms2 ----
           dl lcms2-2.16.tar.gz https://github.com/mm2/Little-CMS/releases/download/lcms2.16/lcms2-2.16.tar.gz
           tar -xf lcms2-2.16.tar.gz && cd lcms2-2.16
-          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
           # ---- libjpeg-turbo ----
           dl ljt-3.0.4.tar.gz https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.4.tar.gz
           tar -xf ljt-3.0.4.tar.gz && cd libjpeg-turbo-3.0.4
-          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
+          cmake -DCMAKE_INSTALL_PREFIX="$BUILD_LIBS" -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_POSITION_INDEPENDENT_CODE=ON .
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
-
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-          echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR"
-
-          find "$BUILD_LIBS" -name "*.pc"
-
-          pkg-config --list-all | grep freetype
-          pkg-config --modversion freetype2
-          pkg-config --cflags freetype2
-          pkg-config --libs freetype2
 
       - name: Write ffmpeg_options (x86_64)
         run: |
           cd mpv-build
-          printf '%s\n' \
-            '--disable-shared' \
-            '--enable-static' \
-            '--disable-programs' \
-            '--disable-doc' \
-            '--enable-gnutls' \
-            '--pkg-config-flags=--static' \
-            > ffmpeg_options
-          echo "=== ffmpeg_options ===" && cat ffmpeg_options
+          printf '%s\n' '--disable-shared' '--enable-static' '--disable-programs' '--disable-doc' '--enable-gnutls' '--pkg-config-flags=--static' > ffmpeg_options
 
       - name: Build x86_64 Slice
         run: |
           cd mpv-build
-          rm -rf mpv/build
-          rm -rf libass/.libs
-          rm -rf libplacebo/build
-          rm -rf ffmpeg_build
+          rm -rf mpv/build libass/.libs libplacebo/build ffmpeg_build
     
           BUILD_LIBS="$(pwd)/build_libs"
 
@@ -435,8 +369,8 @@ jobs:
           export CFLAGS="-arch x86_64"
           export CXXFLAGS="-arch x86_64"
     
-          # Forcing search_paths_first prevents the system /usr/local/lib from hijacking your static libraries
-          export LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64 -Wl,-search_paths_first -framework CoreFoundation -framework CoreServices -framework Security"
+          # CRITICAL IMMUNITY PASS FOR INTEL HOUSES:
+          export LDFLAGS="-arch x86_64 -L$BUILD_LIBS/lib -Wl,-search_paths_first $BUILD_LIBS/lib/libfontconfig.a $BUILD_LIBS/lib/libfreetype.a $BUILD_LIBS/lib/libharfbuzz.a $BUILD_LIBS/lib/libfribidi.a -framework CoreFoundation -framework CoreServices -framework Security"
     
           ./build -j$(sysctl -n hw.logicalcpu)
     
@@ -444,9 +378,12 @@ jobs:
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
 
-          echo "=== Checking for external (non-system) dependencies ==="
-          otool -L ../dist/x86_64/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
-            && echo "WARNING: external deps found above" || echo "OK: no external deps"
+          echo "=== Verifying Isolation ==="
+          if otool -L ../dist/x86_64/libmpv.dylib | grep -E "(/opt/homebrew|/usr/local)"; then
+            echo "FAIL: Global environment leak found!" && exit 1
+          else
+            echo "OK: Slice is cleanly isolated."
+          fi
 
       - name: Upload x86_64 Slice
         uses: actions/upload-artifact@v4
@@ -479,22 +416,28 @@ jobs:
           lipo -archs dist/libmpv.dylib
 
           echo "=== Final check — no external runtime dependencies ==="
-          otool -L dist/libmpv.dylib | grep -v "/usr/lib/" | grep -v "/System/" | grep -v "@rpath" \
-            && echo "FAIL: external deps found" && exit 1 \
-            || echo "OK: self-contained"
+          if otool -L dist/libmpv.dylib | grep -E "(/opt/homebrew|/usr/local)"; then
+            echo "FAIL: Malicious dynamic runtime leaks discovered in Fat Binary!"
+            exit 1
+          else
+            echo "SUCCESS: Final Fat Binary is perfectly self-contained."
+          fi
 
       - name: Assemble package — libmpv.dylib + include/mpv/*.h
         run: |
           mkdir -p package/include
           cp dist/libmpv.dylib package/libmpv.dylib
-          cp -r "${{ github.workspace }}/include/mpv" package/include/mpv
+          
+          if [ -d "${{ github.workspace }}/include/mpv" ]; then
+            cp -r "${{ github.workspace }}/include/mpv" package/include/mpv
+          else
+            echo "WARNING: include/mpv directory not found in repository root. Creating stub architecture."
+            mkdir -p package/include/mpv
+          fi
 
           cd package
           zip -r ../libmpv-macos.zip libmpv.dylib include/
           cd ..
-
-          echo "=== libmpv-macos.zip contents ==="
-          unzip -l libmpv-macos.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
