@@ -236,6 +236,8 @@ jobs:
           rm -f /usr/local/lib/pkgconfig/fribidi.pc
           rm -f /usr/local/lib/pkgconfig/gnutls.pc
 
+          rm -f /usr/local/lib/pkgconfig/gettext.pc
+
           echo "=== Verification Check ==="
           ls /usr/local/lib/libfontconfig* 2>/dev/null && echo "WARNING: fontconfig still there" || echo "SUCCESS: fontconfig gone"
           ls /usr/local/lib/libfreetype* 2>/dev/null && echo "WARNING: freetype still there" || echo "SUCCESS: freetype gone"
