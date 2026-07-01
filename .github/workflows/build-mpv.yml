@@ -223,29 +223,6 @@ jobs:
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja cmake nasm
 
-      - name: Force Purge Conflicting Homebrew Slices (Intel only)
-        run: |
-          echo "=== Removing libraries that conflict with our static toolchain ==="
-          # CRITICAL: We removed 'gettext' from this list to keep git functional!
-          brew uninstall --ignore-dependencies fontconfig freetype harfbuzz fribidi gnutls nettle libidn2 libunistring lcms2 little-cms2 || true
-          
-          echo "=== Clearing dangling configuration links ==="
-          rm -f /usr/local/lib/pkgconfig/fontconfig.pc
-          rm -f /usr/local/lib/pkgconfig/freetype2.pc
-          rm -f /usr/local/lib/pkgconfig/harfbuzz.pc
-          rm -f /usr/local/lib/pkgconfig/fribidi.pc
-          rm -f /usr/local/lib/pkgconfig/gnutls.pc
-
-          rm -f /usr/local/lib/pkgconfig/gettext.pc
-
-          echo "=== Verification Check ==="
-          ls /usr/local/lib/libfontconfig* 2>/dev/null && echo "WARNING: fontconfig still there" || echo "SUCCESS: fontconfig gone"
-          ls /usr/local/lib/libfreetype* 2>/dev/null && echo "WARNING: freetype still there" || echo "SUCCESS: freetype gone"
-          
-          # Quick sanity test for git environment availability
-          echo "=== Testing Git Status ==="
-          git --version
-
       - name: Clone mpv-build & Write Options
         run: |
           git clone https://github.com/mpv-player/mpv-build.git
@@ -271,6 +248,20 @@ jobs:
             > libass_options
 
           ./update
+
+      - name: Total Lockout - Purge Homebrew Store (Intel only)
+        run: |
+          echo "=== Closing the store: Wiping out ALL conflicting host dependencies ==="
+          # NOW we drop gettext safely because git clone is already done!
+          brew uninstall --ignore-dependencies fontconfig freetype harfbuzz fribidi gnutls nettle libidn2 gettext libunistring lcms2 little-cms2 || true
+          
+          echo "=== Scorched earth on leftover configuration records ==="
+          rm -rf /usr/local/lib/pkgconfig/*
+          rm -rf /usr/local/opt/gettext
+
+          echo "=== Verifying store is completely empty ==="
+          ls /usr/local/lib/libfontconfig* 2>/dev/null && echo "leak" || echo "fontconfig clean"
+          ls /usr/local/lib/libintl* 2>/dev/null && echo "leak" || echo "gettext clean"
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
