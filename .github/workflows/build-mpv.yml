@@ -347,6 +347,11 @@ jobs:
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
+      - name: Write ffmpeg_options (x86_64)
+        run: |
+          cd mpv-build
+          printf '%s\n' '--disable-shared' '--enable-static' '--disable-programs' '--disable-doc' '--enable-gnutls' '--pkg-config-flags=--static' > ffmpeg_options
+
       - name: Fix gnutls.pc broken framework flags
         run: |
           BUILD_LIBS="$(pwd)/mpv-build/build_libs"
