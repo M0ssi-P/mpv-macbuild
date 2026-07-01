@@ -96,7 +96,7 @@ jobs:
           cd ..
 
           # ---- libidn2 ----
-          dl libidn2-2.3.7.tar.gz https://github.com/libidn/libidn2/releases/download/v2.3.7/libidn2-2.3.7.tar.gz
+          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
           CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch arm64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=aarch64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
@@ -284,7 +284,7 @@ jobs:
           cd ..
 
           # ---- libidn2 ----
-          dl libidn2-2.3.7.tar.gz https://github.com/libidn/libidn2/releases/download/v2.3.7/libidn2-2.3.7.tar.gz
+          dl libidn2-2.3.7.tar.gz https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
           tar -xf libidn2-2.3.7.tar.gz && cd libidn2-2.3.7
           CPPFLAGS="-I$BUILD_LIBS/include" LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64" ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static --host=x86_64-apple-darwin
           make -j$(sysctl -n hw.logicalcpu) && make install
