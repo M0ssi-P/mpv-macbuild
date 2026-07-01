@@ -32,7 +32,7 @@ jobs:
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
             '-Dswift-build=disabled' \
-            '-Dcocoa=disabled' \
+            '-Dcocoa=enabled' \
             '-Dmacos-cocoa-cb=disabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
@@ -235,7 +235,7 @@ jobs:
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
             '-Dswift-build=disabled' \
-            '-Dcocoa=disabled' \
+            '-Dcocoa=enabled' \
             '-Dmacos-cocoa-cb=disabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
