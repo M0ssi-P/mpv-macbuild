@@ -344,6 +344,39 @@ jobs:
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
+      - name: Debug GnuTLS pkg-config resolution (x86_64)
+          run: |
+            BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+            export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
+            export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+
+            echo "=== All .pc files ==="
+            find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" | sort
+
+            echo "=== gnutls.pc ==="
+            cat "$BUILD_LIBS/lib/pkgconfig/gnutls.pc"
+
+            echo "=== nettle.pc ==="
+            cat "$BUILD_LIBS/lib/pkgconfig/nettle.pc" 2>/dev/null || echo "MISSING"
+
+            echo "=== hogweed.pc ==="
+            cat "$BUILD_LIBS/lib/pkgconfig/hogweed.pc" 2>/dev/null || echo "MISSING"
+
+            echo "=== gmp.pc ==="
+            cat "$BUILD_LIBS/lib/pkgconfig/gmp.pc" 2>/dev/null || echo "MISSING"
+
+            echo "=== libidn2.pc ==="
+            cat "$BUILD_LIBS/lib/pkgconfig/libidn2.pc" 2>/dev/null || echo "MISSING"
+
+            echo "=== pkg-config --exists gnutls ==="
+            pkg-config --exists gnutls && echo "OK" || echo "FAIL"
+
+            echo "=== pkg-config --libs gnutls ==="
+            pkg-config --libs gnutls && echo "OK" || echo "FAIL"
+
+            echo "=== pkg-config --libs gnutls verbose ==="
+            pkg-config --debug --libs gnutls 2>&1 | tail -30 || true
+ 
       - name: Build x86_64 Slice
         run: |
           cd mpv-build
