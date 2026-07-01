@@ -51,16 +51,14 @@ jobs:
           BUILD_LIBS="$(pwd)/mpv-build/build_libs"
           TARGET_SCRIPT="mpv-build/scripts/ffmpeg-config"
 
-          # Guard rail: Verify upstream anchor exists
           if ! grep -q "set -e" "$TARGET_SCRIPT"; then
             echo "CRITICAL ERROR: Upstream changed scripts/ffmpeg-config! 'set -e' anchor not found."
             exit 1
           fi
 
-          # Inject paths right below the script initialization header
-          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" "$TARGET_SCRIPT"
+          # Append to PATH instead of hard-locking LIBDIR
+          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_ALLOW_SYSTEM_LIBS=1|" "$TARGET_SCRIPT"
     
-          # Verify the patch bound successfully
           if ! grep -q "build_libs/lib/pkgconfig" "$TARGET_SCRIPT"; then
             echo "CRITICAL ERROR: Patch failed to inject into scripts/ffmpeg-config!"
             exit 1
@@ -247,7 +245,8 @@ jobs:
             exit 1
           fi
 
-          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_LIBDIR=\"${BUILD_LIBS}/lib/pkgconfig\"|" "$TARGET_SCRIPT"
+          # Append to PATH instead of hard-locking LIBDIR
+          sed -i '' "s|set -e|set -e\nexport PKG_CONFIG_PATH=\"${BUILD_LIBS}/lib/pkgconfig:\$PKG_CONFIG_PATH\"\nexport PKG_CONFIG_ALLOW_SYSTEM_LIBS=1|" "$TARGET_SCRIPT"
     
           if ! grep -q "build_libs/lib/pkgconfig" "$TARGET_SCRIPT"; then
             echo "CRITICAL ERROR: Patch failed to inject into scripts/ffmpeg-config!"
@@ -357,19 +356,19 @@ jobs:
           find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreServices/-framework CoreServices/g' {} +
           find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,-framework//g' {} +
 
+          # Clean sandbox environment passing system fallbacks cleanly
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
-          export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
           export PKG_CONFIG_ALL_STATIC=1
     
           export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
           export CFLAGS="-arch x86_64"
           export CXXFLAGS="-arch x86_64"
     
-          # CLEAN LDFLAGS: Keeps Meson sanity checks happy, forces searching our static dir first
+          # CLEAN LDFLAGS: Keeps Meson sanity checks happy
           export LDFLAGS="-arch x86_64 -L$BUILD_LIBS/lib -Wl,-search_paths_first -framework CoreFoundation -framework CoreServices -framework Security"
     
-          # INJECT EXTRA FLAGS EXCLUSIVELY TO MPV/LIBPLACEBO: 
-          # This appends the static overrides directly to the actual compilation targets without breaking the global environment tests
+          # Pass the heavy force-loads exclusively to mpv/libplacebo compilation targets
           printf '%s\n' \
             "-Dlink_args=['-Wl,-search_paths_first','-Wl,-force_load,$BUILD_LIBS/lib/libfontconfig.a','-Wl,-force_load,$BUILD_LIBS/lib/libfreetype.a','-Wl,-force_load,$BUILD_LIBS/lib/libharfbuzz.a','-Wl,-force_load,$BUILD_LIBS/lib/libfribidi.a']" \
             >> mpv_options
