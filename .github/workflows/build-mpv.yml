@@ -205,12 +205,17 @@ jobs:
 
           BUILD_LIBS="$(pwd)/build_libs"
           
+          # FORCE pkg-config to output static flags exclusively
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_ALL_STATIC=1
+    
           export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
-          export LDFLAGS="-L$BUILD_LIBS/lib -arch arm64"
           export CFLAGS="-arch arm64"
           export CXXFLAGS="-arch arm64"
+    
+          # CRITICAL: -Wl,-search_paths_first forces ld to look for .a before matching a .dylib in any directory
+          export LDFLAGS="-L$BUILD_LIBS/lib -arch arm64 -Wl,-search_paths_first -framework CoreFoundation -framework CoreServices -framework Security"
           ./build -j$(sysctl -n hw.logicalcpu)
           
           grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
@@ -418,17 +423,20 @@ jobs:
     
           BUILD_LIBS="$(pwd)/build_libs"
 
-          # Sanitize any malformed linker options inside our static build metadata for x86_64
           find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreFoundation/-framework CoreFoundation/g' {} +
           find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,CoreServices/-framework CoreServices/g' {} +
           find "$BUILD_LIBS/lib/pkgconfig" -name "*.pc" -exec sed -i '' 's/-Wl,-framework//g' {} +
 
           export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_ALL_STATIC=1
+    
           export CPPFLAGS="-I$BUILD_LIBS/include -I$BUILD_LIBS/include/freetype2 -I$BUILD_LIBS/include/fribidi -I$BUILD_LIBS/include/harfbuzz"
-          export LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64"
           export CFLAGS="-arch x86_64"
           export CXXFLAGS="-arch x86_64"
+    
+          # Forcing search_paths_first prevents the system /usr/local/lib from hijacking your static libraries
+          export LDFLAGS="-L$BUILD_LIBS/lib -arch x86_64 -Wl,-search_paths_first -framework CoreFoundation -framework CoreServices -framework Security"
     
           ./build -j$(sysctl -n hw.logicalcpu)
     
