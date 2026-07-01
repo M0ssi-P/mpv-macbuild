@@ -100,6 +100,17 @@ jobs:
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
+          # ---- gettext (libintl) ----
+          dl gettext-0.22.5.tar.xz https://ftp.gnu.org/gnu/gettext/gettext-0.22.5.tar.xz
+          tar -xf gettext-0.22.5.tar.xz && cd gettext-0.22.5
+          ./configure --prefix="$BUILD_LIBS" --disable-shared --enable-static \
+            --host=x86_64-apple-darwin \
+            --disable-java --disable-native-java --disable-csharp \
+            --disable-libasprintf --without-emacs \
+            --with-included-libunistring
+          make -j$(sysctl -n hw.logicalcpu) && make install
+          cd ..
+
           # ---- GnuTLS ----
           dl gnutls-3.8.9.tar.xz https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
           tar -xf gnutls-3.8.9.tar.xz && cd gnutls-3.8.9
@@ -211,6 +222,14 @@ jobs:
       - name: Install Build Prerequisites
         run: |
           brew install automake autoconf libtool pkg-config coreutils wget python3 meson ninja cmake nasm
+
+      - name: Uninstall conflicting Homebrew packages (Intel only)
+        run: |
+          brew uninstall --ignore-dependencies fontconfig freetype harfbuzz fribidi gnutls nettle libidn2 gettext libunistring lcms2 little-cms2 || true
+          echo "=== Verify gone ==="
+          ls /usr/local/lib/libfontconfig* 2>/dev/null && echo "still there" || echo "gone"
+          ls /usr/local/lib/libfreetype* 2>/dev/null && echo "still there" || echo "gone"
+          ls /usr/local/lib/libharfbuzz* 2>/dev/null && echo "still there" || echo "gone"
 
       - name: Clone mpv-build & Write Options
         run: |
