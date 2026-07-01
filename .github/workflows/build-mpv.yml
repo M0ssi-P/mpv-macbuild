@@ -344,6 +344,29 @@ jobs:
           make -j$(sysctl -n hw.logicalcpu) && make install
           cd ..
 
+      - name: Fix gnutls.pc broken framework flags
+        run: |
+          BUILD_LIBS="$(pwd)/mpv-build/build_libs"
+          PC="$BUILD_LIBS/lib/pkgconfig/gnutls.pc"
+
+          # Replace broken -Wl,-framework -Wl,X with -framework X
+          sed -i '' \
+            's|-Wl,-framework -Wl,CoreFoundation|-framework CoreFoundation|g' "$PC"
+          sed -i '' \
+            's|-Wl,-framework -Wl,CoreServices|-framework CoreServices|g' "$PC"
+          sed -i '' \
+            's|-Wl,-framework -Wl,Security|-framework Security|g' "$PC"
+
+          # Verify
+          echo "=== Fixed gnutls.pc Libs.private ==="
+          grep "Libs.private" "$PC"
+
+          # Confirm pkg-config --static now works
+          export PKG_CONFIG_PATH="$BUILD_LIBS/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$BUILD_LIBS/lib/pkgconfig"
+          echo "=== pkg-config --static --libs gnutls ==="
+          pkg-config --static --libs gnutls && echo "OK" || echo "FAIL"
+
       - name: Debug GnuTLS pkg-config resolution (x86_64)
         run: |
             BUILD_LIBS="$(pwd)/mpv-build/build_libs"
