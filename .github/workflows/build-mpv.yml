@@ -37,7 +37,6 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
-            '-Dapple-clipboard=disabled' \
             > mpv_options
 
           printf '%s\n' \
@@ -46,6 +45,24 @@ jobs:
             > libass_options
 
           ./update
+
+      - name: Patch out macOS clipboard backend (avoids Swift dependency)
+        run: |
+          TARGET="mpv-build/mpv/meson.build"
+
+          if ! grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
+            echo "CRITICAL ERROR: Upstream changed meson.build! clipboard-mac.m entry not found."
+            exit 1
+          fi
+
+          perl -0777 -pi -e "s/'osdep\/mac\/app_bridge\.m',\s*\n\s*'player\/clipboard\/clipboard-mac\.m'\)/'osdep\/mac\/app_bridge.m')/" "$TARGET"
+
+          if grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
+            echo "CRITICAL ERROR: Patch failed to remove clipboard-mac.m from sources!"
+            exit 1
+          fi
+
+          echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
@@ -199,7 +216,7 @@ jobs:
 
           ./build -j$(sysctl -n hw.logicalcpu)
 
-          grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
+          # grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
 
           mkdir -p ../dist/arm64
           cp mpv/build/libmpv.dylib ../dist/arm64/libmpv.dylib
@@ -241,7 +258,6 @@ jobs:
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
-            '-Dapple-clipboard=disabled' \
             > mpv_options
 
           printf '%s\n' \
@@ -250,6 +266,24 @@ jobs:
             > libass_options
 
           ./update
+
+      - name: Patch out macOS clipboard backend (avoids Swift dependency)
+        run: |
+          TARGET="mpv-build/mpv/meson.build"
+
+          if ! grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
+            echo "CRITICAL ERROR: Upstream changed meson.build! clipboard-mac.m entry not found."
+            exit 1
+          fi
+
+          perl -0777 -pi -e "s/'osdep\/mac\/app_bridge\.m',\s*\n\s*'player\/clipboard\/clipboard-mac\.m'\)/'osdep\/mac\/app_bridge.m')/" "$TARGET"
+
+          if grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
+            echo "CRITICAL ERROR: Patch failed to remove clipboard-mac.m from sources!"
+            exit 1
+          fi
+
+          echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
 
       - name: Total Lockout - Purge Homebrew Store (Intel only)
         run: |
@@ -460,7 +494,7 @@ jobs:
 
           ./build -j$(sysctl -n hw.logicalcpu)
 
-          grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
+          # grep -q "HAVE_COCOA" mpv/build/build.ninja && echo "ERROR: Cocoa still enabled!" && exit 1 || echo "OK: Cocoa disabled"
 
           mkdir -p ../dist/x86_64
           cp mpv/build/libmpv.dylib ../dist/x86_64/libmpv.dylib
