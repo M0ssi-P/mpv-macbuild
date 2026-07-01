@@ -46,30 +46,32 @@ jobs:
 
           ./update
 
-      - name: Patch out macOS clipboard backend (avoids Swift dependency)
+      - name: Completely Remove macOS Clipboard Backend from Source & Registry
         run: |
-          TARGET="mpv-build/mpv/meson.build"
+          # 1. Remove the file implementation from the build definition
+          # This prevents meson from looking for the .m / Swift-tied file
+          SED_EXT=""
+          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
+    
+          TARGET_MESON="mpv-build/mpv/meson.build"
+          sed -i $SED_EXT '/clipboard-mac.m/d' "$TARGET_MESON"
 
-          if ! grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
-            echo "CRITICAL ERROR: Upstream changed meson.build! clipboard-mac.m entry not found."
+          # 2. Unregister the backend from mpv's internal clipboard array
+          TARGET_CLIPBOARD="mpv-build/mpv/player/clipboard/clipboard.c"
+    
+          echo "Pre-patch check for macos backend reference:"
+          grep -n "clipboard_backend_mac" "$TARGET_CLIPBOARD" || true
+    
+          # Remove the registry line entirely so mpv never knows it existed
+          sed -i $SED_EXT '/&clipboard_backend_mac/d' "$TARGET_CLIPBOARD"
+    
+          echo "Post-patch verification:"
+          if grep -q "clipboard_backend_mac" "$TARGET_CLIPBOARD"; then
+            echo "CRITICAL ERROR: clipboard_backend_mac entry is still present in registry!"
             exit 1
+          else
+            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
           fi
-
-          perl -0777 -pi -e "s/'osdep\/mac\/app_bridge\.m',\s*\n\s*'player\/clipboard\/clipboard-mac\.m'\)/'osdep\/mac\/app_bridge.m')/" "$TARGET"
-
-          if grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
-            echo "CRITICAL ERROR: Patch failed to remove clipboard-mac.m from sources!"
-            exit 1
-          fi
-
-          echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
-
-      - name: Inject Clipboard Linker Stub for Java dlopen Satisfaction
-        run: |
-          # Append a blank symbol to language-mac.c so System.load() can find it
-          echo "" >> mpv-build/mpv/osdep/language-mac.c
-          echo "struct clipboard_backend { const char *name; void *placeholder[10]; };" >> mpv-build/mpv/osdep/language-mac.c
-          echo "const struct clipboard_backend clipboard_backend_mac = { .name = \"macos_stub\" };" >> mpv-build/mpv/osdep/language-mac.c
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
@@ -274,30 +276,32 @@ jobs:
 
           ./update
 
-      - name: Patch out macOS clipboard backend (avoids Swift dependency)
+      - name: Completely Remove macOS Clipboard Backend from Source & Registry
         run: |
-          TARGET="mpv-build/mpv/meson.build"
+          # 1. Remove the file implementation from the build definition
+          # This prevents meson from looking for the .m / Swift-tied file
+          SED_EXT=""
+          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
+    
+          TARGET_MESON="mpv-build/mpv/meson.build"
+          sed -i $SED_EXT '/clipboard-mac.m/d' "$TARGET_MESON"
 
-          if ! grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
-            echo "CRITICAL ERROR: Upstream changed meson.build! clipboard-mac.m entry not found."
+          # 2. Unregister the backend from mpv's internal clipboard array
+          TARGET_CLIPBOARD="mpv-build/mpv/player/clipboard/clipboard.c"
+    
+          echo "Pre-patch check for macos backend reference:"
+          grep -n "clipboard_backend_mac" "$TARGET_CLIPBOARD" || true
+    
+          # Remove the registry line entirely so mpv never knows it existed
+          sed -i $SED_EXT '/&clipboard_backend_mac/d' "$TARGET_CLIPBOARD"
+    
+          echo "Post-patch verification:"
+          if grep -q "clipboard_backend_mac" "$TARGET_CLIPBOARD"; then
+            echo "CRITICAL ERROR: clipboard_backend_mac entry is still present in registry!"
             exit 1
+          else
+            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
           fi
-
-          perl -0777 -pi -e "s/'osdep\/mac\/app_bridge\.m',\s*\n\s*'player\/clipboard\/clipboard-mac\.m'\)/'osdep\/mac\/app_bridge.m')/" "$TARGET"
-
-          if grep -q "player/clipboard/clipboard-mac.m" "$TARGET"; then
-            echo "CRITICAL ERROR: Patch failed to remove clipboard-mac.m from sources!"
-            exit 1
-          fi
-
-          echo "SUCCESS: macOS clipboard backend removed, cocoa VO untouched."
-
-      - name: Inject Clipboard Linker Stub for Java dlopen Satisfaction
-        run: |
-          # Append a blank symbol to language-mac.c so System.load() can find it
-          echo "" >> mpv-build/mpv/osdep/language-mac.c
-          echo "struct clipboard_backend { const char *name; void *placeholder[10]; };" >> mpv-build/mpv/osdep/language-mac.c
-          echo "const struct clipboard_backend clipboard_backend_mac = { .name = \"macos_stub\" };" >> mpv-build/mpv/osdep/language-mac.c
 
       - name: Total Lockout - Purge Homebrew Store (Intel only)
         run: |
