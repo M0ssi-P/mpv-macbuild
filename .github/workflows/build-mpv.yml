@@ -31,9 +31,9 @@ jobs:
           printf '%s\n' \
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
-            '-Dswift-build=disabled' \
+            '-Dswift-build=enabled' \
             '-Dcocoa=enabled' \
-            '-Dmacos-cocoa-cb=disabled' \
+            '-Dmacos-cocoa-cb=enabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
@@ -46,37 +46,37 @@ jobs:
 
           ./update
 
-      - name: Hard Purge macOS Clipboard Backend & Unregister
-        run: |
-          # Define targets
-          TARGET_M="mpv-build/mpv/player/clipboard/clipboard-mac.m"
-          TARGET_C="mpv-build/mpv/player/clipboard/clipboard.c"
+      # - name: Hard Purge macOS Clipboard Backend & Unregister
+      #   run: |
+      #     # Define targets
+      #     TARGET_M="mpv-build/mpv/player/clipboard/clipboard-mac.m"
+      #     TARGET_C="mpv-build/mpv/player/clipboard/clipboard.c"
     
-          # 1. Wipe out the entire contents of clipboard-mac.m 
-          # This tricks Meson/Ninja into compiling an empty file, bypassing the missing swift.h header error!
-          if [ -f "$TARGET_M" ]; then
-            echo "" > "$TARGET_M"
-            echo "SUCCESS: clipboard-mac.m has been entirely emptied."
-          else
-            echo "WARNING: clipboard-mac.m not found at expected path."
-          fi
+      #     # 1. Wipe out the entire contents of clipboard-mac.m 
+      #     # This tricks Meson/Ninja into compiling an empty file, bypassing the missing swift.h header error!
+      #     if [ -f "$TARGET_M" ]; then
+      #       echo "" > "$TARGET_M"
+      #       echo "SUCCESS: clipboard-mac.m has been entirely emptied."
+      #     else
+      #       echo "WARNING: clipboard-mac.m not found at expected path."
+      #     fi
 
-          # 2. Unregister the backend from the C registry so it doesn't try to initialize a blank backend
-          SED_EXT=""
-          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
+      #     # 2. Unregister the backend from the C registry so it doesn't try to initialize a blank backend
+      #     SED_EXT=""
+      #     if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
     
-          echo "Pre-patch check for macos backend reference:"
-          grep -n "clipboard_backend_mac" "$TARGET_C" || true
+      #     echo "Pre-patch check for macos backend reference:"
+      #     grep -n "clipboard_backend_mac" "$TARGET_C" || true
     
-          sed -i $SED_EXT '/clipboard_backend_mac/d' "$TARGET_C"
+      #     sed -i $SED_EXT '/clipboard_backend_mac/d' "$TARGET_C"
     
-          echo "Post-patch verification:"
-          if grep -q "clipboard_backend_mac" "$TARGET_C"; then
-            echo "CRITICAL ERROR: entry still present in registry!"
-            exit 1
-          else
-            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
-          fi
+      #     echo "Post-patch verification:"
+      #     if grep -q "clipboard_backend_mac" "$TARGET_C"; then
+      #       echo "CRITICAL ERROR: entry still present in registry!"
+      #       exit 1
+      #     else
+      #       echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
+      #     fi
 
       - name: Patch ffmpeg-config for Static Path Inheritance
         run: |
@@ -266,9 +266,9 @@ jobs:
           printf '%s\n' \
             '-Dlibmpv=true' \
             '-Dcplayer=false' \
-            '-Dswift-build=disabled' \
+            '-Dswift-build=enabled' \
             '-Dcocoa=enabled' \
-            '-Dmacos-cocoa-cb=disabled' \
+            '-Dmacos-cocoa-cb=enabled' \
             '-Dmacos-media-player=disabled' \
             '-Dmacos-touchbar=disabled' \
             '-Dx11=disabled' \
@@ -281,37 +281,37 @@ jobs:
 
           ./update
 
-      - name: Hard Purge macOS Clipboard Backend & Unregister
-        run: |
-          # Define targets
-          TARGET_M="mpv-build/mpv/player/clipboard/clipboard-mac.m"
-          TARGET_C="mpv-build/mpv/player/clipboard/clipboard.c"
+      # - name: Hard Purge macOS Clipboard Backend & Unregister
+      #   run: |
+      #     # Define targets
+      #     TARGET_M="mpv-build/mpv/player/clipboard/clipboard-mac.m"
+      #     TARGET_C="mpv-build/mpv/player/clipboard/clipboard.c"
     
-          # 1. Wipe out the entire contents of clipboard-mac.m 
-          # This tricks Meson/Ninja into compiling an empty file, bypassing the missing swift.h header error!
-          if [ -f "$TARGET_M" ]; then
-            echo "" > "$TARGET_M"
-            echo "SUCCESS: clipboard-mac.m has been entirely emptied."
-          else
-            echo "WARNING: clipboard-mac.m not found at expected path."
-          fi
+      #     # 1. Wipe out the entire contents of clipboard-mac.m 
+      #     # This tricks Meson/Ninja into compiling an empty file, bypassing the missing swift.h header error!
+      #     if [ -f "$TARGET_M" ]; then
+      #       echo "" > "$TARGET_M"
+      #       echo "SUCCESS: clipboard-mac.m has been entirely emptied."
+      #     else
+      #       echo "WARNING: clipboard-mac.m not found at expected path."
+      #     fi
 
-          # 2. Unregister the backend from the C registry so it doesn't try to initialize a blank backend
-          SED_EXT=""
-          if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
+      #     # 2. Unregister the backend from the C registry so it doesn't try to initialize a blank backend
+      #     SED_EXT=""
+      #     if [[ "$OSTYPE" == "darwin"* ]]; then SED_EXT="''"; fi
     
-          echo "Pre-patch check for macos backend reference:"
-          grep -n "clipboard_backend_mac" "$TARGET_C" || true
+      #     echo "Pre-patch check for macos backend reference:"
+      #     grep -n "clipboard_backend_mac" "$TARGET_C" || true
     
-          sed -i $SED_EXT '/clipboard_backend_mac/d' "$TARGET_C"
+      #     sed -i $SED_EXT '/clipboard_backend_mac/d' "$TARGET_C"
     
-          echo "Post-patch verification:"
-          if grep -q "clipboard_backend_mac" "$TARGET_C"; then
-            echo "CRITICAL ERROR: entry still present in registry!"
-            exit 1
-          else
-            echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
-          fi
+      #     echo "Post-patch verification:"
+      #     if grep -q "clipboard_backend_mac" "$TARGET_C"; then
+      #       echo "CRITICAL ERROR: entry still present in registry!"
+      #       exit 1
+      #     else
+      #       echo "SUCCESS: macOS clipboard backend successfully unregistered from C source."
+      #     fi
 
       - name: Total Lockout - Purge Homebrew Store (Intel only)
         run: |
